@@ -1,0 +1,27 @@
+{
+  "name": "oracle-db-proxy",
+  "module": "src/index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "bun src/index.ts",
+    "dev": "bun --hot src/index.ts",
+    "typecheck": "bun tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^25.3.0",
+    "@types/oracledb": "^6.10.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@griffithswaite/ts-plsql-parser": "^1.0.5",
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "antlr4": "^4.13.0",
+    "js-yaml": "^4.1.1",
+    "oracledb": "^6.10.0",
+    "zod": "^4.3.6"
+  }
+}
