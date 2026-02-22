@@ -1,4 +1,4 @@
-# Read-Only Database MCP Proxy — Project Specification
+# Read-Only Database MCP Proxy - Project Specification
 
 ## Overview
 
@@ -21,12 +21,12 @@ A read-only database proxy exposed as an MCP (Model Context Protocol) server, bu
 - **Runtime:** Bun (latest stable)
 - **Language:** TypeScript (strict mode)
 - **Key dependencies:**
-  - `@modelcontextprotocol/sdk` — MCP server scaffolding
-  - `oracledb` — Oracle database connectivity (official Oracle npm package)
-  - `@griffithswaite/ts-plsql-parser` — Oracle PL/SQL parse-tree validation
-  - `zod` — Tool parameter schema validation and description
-  - `js-yaml` — YAML config parsing
-  - `bun:sqlite` — Audit database (SQLite)
+  - `@modelcontextprotocol/sdk` - MCP server scaffolding
+  - `oracledb` - Oracle database connectivity (official Oracle npm package)
+  - `@griffithswaite/ts-plsql-parser` - Oracle PL/SQL parse-tree validation
+  - `zod` - Tool parameter schema validation and description
+  - `js-yaml` - YAML config parsing
+  - `bun:sqlite` - Audit database (SQLite)
 
 ---
 
@@ -35,7 +35,7 @@ A read-only database proxy exposed as an MCP (Model Context Protocol) server, bu
 ```
 project root/
   src/
-    index.ts              # Entry point — init check, then start MCP server
+    index.ts              # Entry point - init check, then start MCP server
     server.ts             # MCP server definition and tool registration
     config.ts             # Config loading and validation
     init.ts               # First-run initialization routine
@@ -194,7 +194,7 @@ const server = new McpServer({
 ### 1. `run_query`
 
 **Description (shown to agent):**
-> Executes a read-only SELECT query against the specified database environment. Use this to retrieve data, inspect records, or investigate table contents. The query must be a SELECT statement — no writes, DDL, or procedure execution is permitted. Returns rows as an array of objects. If results exceed the row limit, a warning is included with the total row count. To paginate large results, use Oracle OFFSET/FETCH NEXT syntax in your query.
+> Executes a read-only SELECT query against the specified database environment. Use this to retrieve data, inspect records, or investigate table contents. The query must be a SELECT statement - no writes, DDL, or procedure execution is permitted. Returns rows as an array of objects. If results exceed the row limit, a warning is included with the total row count. To paginate large results, use Oracle OFFSET/FETCH NEXT syntax in your query.
 
 **Parameters:**
 
@@ -207,7 +207,7 @@ const server = new McpServer({
 
 1. Validate `environment` exists in config
 2. Pass `sql` through the safety validator (see Validation section)
-3. If validation fails, return a detailed rejection message — do not execute
+3. If validation fails, return a detailed rejection message - do not execute
 4. Resolve effective `max_rows` for the environment
 5. Wrap the validated query in a ROWNUM limit: `SELECT * FROM (<original_sql>) WHERE ROWNUM <= :maxRows`
 6. Execute with the environment's configured timeout
@@ -266,7 +266,7 @@ const server = new McpServer({
 ### 2. `list_tables`
 
 **Description (shown to agent):**
-> Lists all tables and views accessible to the current user in the specified environment. Optionally filter by schema. Use this to orient yourself before writing a query — do not guess table names.
+> Lists all tables and views accessible to the current user in the specified environment. Optionally filter by schema. Use this to orient yourself before writing a query - do not guess table names.
 
 **Parameters:**
 
@@ -299,7 +299,7 @@ Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an 
 ### 3. `get_table_schema`
 
 **Description (shown to agent):**
-> Returns the column definitions for a specific table or view — column names, data types, nullability, and any available comments. Use this before querying a table you are unfamiliar with.
+> Returns the column definitions for a specific table or view - column names, data types, nullability, and any available comments. Use this before querying a table you are unfamiliar with.
 
 **Parameters:**
 
@@ -355,31 +355,31 @@ If allowlist enforcement blocks access, the response shape is:
 
 ## SQL Safety Validation
 
-All SQL submitted to `run_query` passes through `validator.ts` before execution. This is the security-critical component and must fail closed — if validation cannot confirm a query is safe, it rejects it.
+All SQL submitted to `run_query` passes through `validator.ts` before execution. This is the security-critical component and must fail closed - if validation cannot confirm a query is safe, it rejects it.
 
 ### Validation Pipeline
 
 Every query passes through these steps in order. Failure at any step immediately returns a rejection with a specific reason.
 
-**Step 1 — Parse**
+**Step 1 - Parse**
 Parse the SQL string using `@griffithswaite/ts-plsql-parser` (Oracle grammar). If parsing fails entirely, reject with: `"Query could not be parsed. Ensure it is valid SQL."` Do not attempt heuristic analysis on unparseable input.
 
-**Step 2 — Statement count**
+**Step 2 - Statement count**
 The parsed script must contain exactly one statement. Reject multiple statements (semicolon-separated) with: `"Multiple statements are not permitted. Submit one SELECT at a time"`
 
-**Step 3 — Root statement type**
+**Step 3 - Root statement type**
 The root statement must be `SELECT`. Reject anything else with the specific type identified: `"Statement type INSERT is not permitted. Only SELECT statements are allowed."`
 
-**Step 4 — Parse-tree walk for write operations**
-Recursively walk every node in the parse tree. If any node represents a write operation — `INSERT`, `UPDATE`, `DELETE`, or `MERGE` — reject with the node type and its parse-tree location: `"Query contains a write operation (INSERT) at root.children[0].children[0]"`
+**Step 4 - Parse-tree walk for write operations**
+Recursively walk every node in the parse tree. If any node represents a write operation - `INSERT`, `UPDATE`, `DELETE`, or `MERGE` - reject with the node type and its parse-tree location: `"Query contains a write operation (INSERT) at root.children[0].children[0]"`
 
-**Step 5 — DDL check**
+**Step 5 - DDL check**
 Reject any node representing DDL: `CREATE`, `DROP`, `ALTER`, `TRUNCATE`, `RENAME`. Rejection reason identifies the DDL type found.
 
-**Step 6 — Execution check**
+**Step 6 - Execution check**
 Reject any node representing procedural execution: `EXEC`, `EXECUTE`, `CALL`, or `BEGIN...END` blocks. Also reject row-locking `FOR UPDATE` clauses.
 
-**Step 7 — Allowlist check (if enabled for environment)**
+**Step 7 - Allowlist check (if enabled for environment)**
 Extract all table references from the parse tree. If any referenced table is not in the environment's `allowed_tables` list, reject with: `"Query references table FORBIDDEN_TABLE which is not in the allowlist for this environment. Allowed tables: SAMPLE, RESULT."` Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access.
 
 ### Failure Mode
@@ -426,15 +426,15 @@ CREATE TABLE IF NOT EXISTS query_log (
 
 - Every call to `run_query` is logged, whether it succeeds, is rejected, times out, or errors
 - `list_tables` and `get_table_schema` are not logged (internal metadata queries)
-- Log writes are fire-and-forget — a failure to write to the audit log must not cause the tool call itself to fail, but should emit a stderr warning
+- Log writes are fire-and-forget - a failure to write to the audit log must not cause the tool call itself to fail, but should emit a stderr warning
 
 ---
 
 ## Error Handling Philosophy
 
-- Validation failures are not errors — they are expected outcomes and return structured rejection responses
-- Timeout is not an error — it returns a structured warning response with partial or empty results
-- Row limit is not an error — it returns results with a warning and `truncated: true`
+- Validation failures are not errors - they are expected outcomes and return structured rejection responses
+- Timeout is not an error - it returns a structured warning response with partial or empty results
+- Row limit is not an error - it returns results with a warning and `truncated: true`
 - Actual errors (DB connection failure, unexpected exception) return a structured error response:
 
 ```json
@@ -467,14 +467,14 @@ What this proxy guarantees:
 - No write operation will reach the database via `run_query`
 - No DDL or procedural execution will reach the database
 - Queries that cannot be fully parsed and confirmed safe are rejected
-- Passwords never appear in config files — only environment variable names
+- Passwords never appear in config files - only environment variable names
 - Row limiting uses bind parameters, not string concatenation
 
 What this proxy does not guarantee:
 - Protection against a compromised database user account
 - Row-level or field-level data masking
 - Network security (assumed to be handled by the environment)
-- Protection if the parser has a bug or grammar gap that causes it to misparse a malicious query — this is mitigated by fail-closed behavior
+- Protection if the parser has a bug or grammar gap that causes it to misparse a malicious query - this is mitigated by fail-closed behavior
 
 ---
 
@@ -490,12 +490,12 @@ What this proxy does not guarantee:
 
 ## Implementation Order
 
-1. Project scaffold — `package.json`, `tsconfig.json`, Bun entry point
-2. Config system — YAML loading, Zod validation, environment resolution
-3. Init routine — directory creation, template config, SQLite schema
-4. SQL validator — parse-tree parsing, all pipeline steps, test cases for evasion attempts
-5. Connection manager — Oracle pool setup, credential resolution, timeout wiring
-6. Executor — pagination wrapper, query execution, result shaping
-7. Audit logger — SQLite writes, fire-and-forget pattern
-8. MCP tools — wire all three tools into the server with Zod schemas and descriptions
-9. End-to-end test — connect a TUI agent and run sample queries against dev
+1. Project scaffold - `package.json`, `tsconfig.json`, Bun entry point
+2. Config system - YAML loading, Zod validation, environment resolution
+3. Init routine - directory creation, template config, SQLite schema
+4. SQL validator - parse-tree parsing, all pipeline steps, test cases for evasion attempts
+5. Connection manager - Oracle pool setup, credential resolution, timeout wiring
+6. Executor - pagination wrapper, query execution, result shaping
+7. Audit logger - SQLite writes, fire-and-forget pattern
+8. MCP tools - wire all three tools into the server with Zod schemas and descriptions
+9. End-to-end test - connect a TUI agent and run sample queries against dev

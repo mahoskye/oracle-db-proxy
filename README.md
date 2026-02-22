@@ -1,27 +1,27 @@
 # oracle-db-proxy
 
-A read-only Oracle database proxy exposed as an MCP (Model Context Protocol) server. Allows AI agents to safely query Oracle databases without any risk of data modification. All safety enforcement is handled at the application layer via SQL parse-tree analysis — no database-level permission changes required.
+A read-only Oracle database proxy exposed as an MCP (Model Context Protocol) server. It allows AI agents to query Oracle databases without data modification risk. All safety enforcement is handled at the application layer via SQL parse-tree analysis, with no database-level permission changes required.
 
 ## Features
 
-- Read-only enforcement via SQL parsing — no writes, DDL, or procedure execution can reach the database
+- Read-only enforcement via SQL parsing, so no writes, DDL, or procedure execution can reach the database
 - Three MCP tools: `run_query`, `list_tables`, `get_table_schema`
 - Multiple named environments (dev, test, prod) from a single config file
 - Per-environment table allowlists
 - Row limits with total count reporting when limits are hit
 - Query timeout enforcement
 - SQLite audit log of all query activity
-- Shared config directory — any MCP-compatible agent on the machine can use the same setup
+- Shared config directory, so any MCP-compatible agent on the machine can use the same setup
 
 ## Requirements
 
 - [Bun](https://bun.sh) (latest stable)
-- Oracle Instant Client (required by `oracledb`) — see [Oracle's installation guide](https://oracle.github.io/node-oracledb/INSTALL.html)
+- Oracle Instant Client (required by `oracledb`), see [Oracle's installation guide](https://oracle.github.io/node-oracledb/INSTALL.html)
 
 ## Installation
 
 ```bash
-git clone https://github.com/yourname/oracle-db-proxy
+git clone https://github.com/mahoskye/oracle-db-proxy
 cd oracle-db-proxy
 bun install
 ```
@@ -119,7 +119,7 @@ environments:
 
 When `allowlist_enabled: true`, only tables listed under `allowed_tables` can be queried via `run_query`.
 `list_tables` is filtered down to allowlisted objects, and `get_table_schema` denies access to non-allowlisted tables.
-The agent receives rejection messages with enough detail to self-correct.
+The agent receives clear rejection messages with enough detail to correct and retry.
 Use `SCHEMA.TABLE` entries when you need cross-schema access. Unqualified entries apply to the connected user's default schema.
 
 When `allowlist_enabled: false`, any table accessible to the database user can be queried.
@@ -140,7 +140,7 @@ The server communicates over stdio and is ready to accept MCP connections.
 
 ## Connecting an Agent
 
-The server uses stdio transport — your MCP client spawns it as a process and communicates over stdin/stdout. Configure your agent with the path to the entry point and the password environment variable.
+The server uses stdio transport. Your MCP client spawns it as a process and communicates over stdin/stdout. Configure your agent with the path to the entry point and the password environment variable.
 
 ### Generic MCP Client Config
 
@@ -246,17 +246,17 @@ If allowlists are enabled and the requested object is not allowlisted, this tool
 
 ## Security Model
 
-All safety enforcement happens in the application layer — no database user configuration is required.
+All safety enforcement happens in the application layer. No database user configuration is required.
 
 Every query submitted to `run_query` passes through a validation pipeline before touching the database:
 
-1. **Parse** — SQL is parsed with `@griffithswaite/ts-plsql-parser` (Oracle PL/SQL grammar). Unparseable input is rejected.
-2. **Single statement** — multiple semicolon-separated statements are rejected.
-3. **SELECT only** — the root statement must be a SELECT.
-4. **Tree walk** — every node in the full parse tree is inspected. Any INSERT, UPDATE, DELETE, MERGE, CREATE, DROP, ALTER, TRUNCATE, EXEC, CALL, or `FOR UPDATE` row-locking clause is rejected, including those hidden inside CTEs.
-5. **Allowlist** — if enabled for the environment, all table references are checked against the allowlist.
+1. **Parse**: SQL is parsed with `@griffithswaite/ts-plsql-parser` (Oracle PL/SQL grammar). Unparseable input is rejected.
+2. **Single statement**: multiple semicolon-separated statements are rejected.
+3. **SELECT only**: the root statement must be a SELECT.
+4. **Tree walk**: every node in the full parse tree is inspected. Any INSERT, UPDATE, DELETE, MERGE, CREATE, DROP, ALTER, TRUNCATE, EXEC, CALL, or `FOR UPDATE` row-locking clause is rejected, including those hidden inside CTEs.
+5. **Allowlist**: if enabled for the environment, all table references are checked against the allowlist.
 
-Rejection messages are returned to the agent with specific details so it can self-correct.
+Rejection messages are returned with specific details so the agent can correct and retry.
 
 ## Audit Log
 
