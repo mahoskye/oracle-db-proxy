@@ -19,14 +19,14 @@ export function createServer(): McpServer {
 
 	server.tool(
 		"list_tables",
-		"Lists all tables and views accessible in the specified environment. Optionally filter by schema. Use this to orient yourself before writing a query — do not guess table names.",
+		"Lists local tables and views accessible in the specified environment. Optionally filter by schema. This tool does not browse remote catalogs over database links. Use this to orient yourself before writing a query — do not guess table names.",
 		listTablesSchema,
 		listTablesHandler
 	);
 
 	server.tool(
 	    "get_table_schema",
-	    "Returns column definitions for a specific table or view — column names, data types, nullability, and comments. Use this before querying a table you are unfamiliar with.",
+	    "Returns column definitions for a specific table or view — column names, data types, nullability, and comments. Supports explicit remote objects via TABLE@DBLINK or SCHEMA.TABLE@DBLINK. Use this before querying a table you are unfamiliar with.",
 	    getTableSchemaSchema,
 	    getTableSchemaHandler
 	);

@@ -50,6 +50,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 			environment: "dev",
 			owner: "HR",
 			table: "SECRET_TABLE",
+			dblink: null,
 		});
 		expect(getConnection).not.toHaveBeenCalled();
 	});
@@ -92,6 +93,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 		expect(payload.table).toBe("EMPLOYEES");
 		expect(payload.owner).toBe("HR");
 		expect(payload.environment).toBe("dev");
+		expect(payload.dblink).toBeNull();
 		expect(payload.columns).toEqual([
 			{
 				name: "EMPLOYEE_ID",
@@ -108,6 +110,206 @@ describe("getTableSchemaHandlerWithDeps", () => {
 				comment: null,
 			},
 		]);
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("accepts schema-qualified table names in the table argument", async () => {
+		const execute = jest.fn(async (_sql: string, binds: unknown) => {
+			expect(binds).toEqual({ schema: "HR", table: "EMPLOYEES" });
+			return {
+				rows: [
+					{
+						NAME: "EMPLOYEE_ID",
+						POSITION: 1,
+						DATA_TYPE: "NUMBER",
+						NULLABLE: 0,
+						COMMENT: "Primary key",
+					},
+				],
+			};
+		});
+		const close = jest.fn(async () => {});
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", table: "hr.employees" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload.owner).toBe("HR");
+		expect(payload.table).toBe("EMPLOYEES");
+		expect(payload.dblink).toBeNull();
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("preserves quoted identifier case for Oracle lookups", async () => {
+		const execute = jest.fn(async (_sql: string, binds: unknown) => {
+			expect(binds).toEqual({ schema: "Hr", table: "Employees" });
+			return {
+				rows: [
+					{
+						NAME: "EmployeeId",
+						POSITION: 1,
+						DATA_TYPE: "NUMBER",
+						NULLABLE: 0,
+						COMMENT: null,
+					},
+				],
+			};
+		});
+		const close = jest.fn(async () => {});
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => ({ ...BASE_ENV, username: "Hr" }),
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", table: '"Hr"."Employees"' },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload.owner).toBe("Hr");
+		expect(payload.table).toBe("Employees");
+		expect(payload.dblink).toBeNull();
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("queries remote metadata over a database link", async () => {
+		const execute = jest.fn(async (sql: string, binds: unknown) => {
+			expect(sql).toContain("FROM all_tab_columns@TEST.DEV2 c");
+			expect(sql).toContain("LEFT JOIN all_col_comments@TEST.DEV2 cc");
+			expect(binds).toEqual({ schema: "HR", table: "EMPLOYEES" });
+			return {
+				rows: [
+					{
+						NAME: "EMPLOYEE_ID",
+						POSITION: 1,
+						DATA_TYPE: "NUMBER",
+						NULLABLE: 0,
+						COMMENT: null,
+					},
+				],
+			};
+		});
+		const close = jest.fn(async () => {});
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", table: "hr.employees@test.dev2" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload.owner).toBe("HR");
+		expect(payload.table).toBe("EMPLOYEES");
+		expect(payload.dblink).toBe("TEST.DEV2");
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("returns INVALID_ARGUMENT for conflicting schema inputs", async () => {
+		const getConnection = jest.fn(async () => ({}));
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: getConnection as never,
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", schema: "sales", table: "hr.employees" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload).toEqual({
+			error: "INVALID_ARGUMENT",
+			message: "Conflicting schema values provided: schema=SALES, table=HR.EMPLOYEES.",
+			environment: "dev",
+		});
+		expect(getConnection).not.toHaveBeenCalled();
+	});
+
+	test("rejects schema arguments that include a database link", async () => {
+		const getConnection = jest.fn(async () => ({}));
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: getConnection as never,
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", schema: "hr@test.dev2", table: "employees" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload).toEqual({
+			error: "INVALID_ARGUMENT",
+			message: "Schema argument must not include a database link. Put the database link in the table argument instead.",
+			environment: "dev",
+		});
+		expect(getConnection).not.toHaveBeenCalled();
+	});
+
+	test("returns TABLE_NOT_FOUND when metadata query returns no columns", async () => {
+		const execute = jest.fn(async () => ({ rows: [] }));
+		const close = jest.fn(async () => {});
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", table: "missing_table" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload).toEqual({
+			error: "TABLE_NOT_FOUND",
+			message: "Table or view HR.MISSING_TABLE was not found or is not visible to the connected user.",
+			environment: "dev",
+			owner: "HR",
+			table: "MISSING_TABLE",
+			dblink: null,
+		});
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("returns TABLE_NOT_FOUND for remote objects when metadata query returns no columns", async () => {
+		const execute = jest.fn(async () => ({ rows: [] }));
+		const close = jest.fn(async () => {});
+		const deps: GetTableSchemaDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await getTableSchemaHandlerWithDeps(
+			{ environment: "dev", table: "employees@test.dev2" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload).toEqual({
+			error: "TABLE_NOT_FOUND",
+			message: "Table or view HR.EMPLOYEES@TEST.DEV2 was not found or is not visible to the connected user.",
+			environment: "dev",
+			owner: "HR",
+			table: "EMPLOYEES",
+			dblink: "TEST.DEV2",
+		});
 		expect(close).toHaveBeenCalledTimes(1);
 	});
 

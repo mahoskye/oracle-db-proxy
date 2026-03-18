@@ -191,4 +191,49 @@ describe("validateQuery", () => {
 		const result = validateQuery("SELECT * FROM hr.employees", ["EMPLOYEES"], "SCOTT");
 		expect(result.valid).toBe(false);
 	});
+
+	test("quoted identifiers preserve case in allowlist checks", () => {
+		const result = validateQuery(
+			'SELECT * FROM "Hr"."Employees"',
+			['"Hr"."Employees"'],
+			"SCOTT"
+		);
+		expect(result.valid).toBe(true);
+	});
+
+	test("quoted identifiers reject mismatched case in allowlist checks", () => {
+		const result = validateQuery(
+			'SELECT * FROM "Hr"."Employees"',
+			['"HR"."EMPLOYEES"'],
+			"SCOTT"
+		);
+		expect(result.valid).toBe(false);
+	});
+
+	test("database link references are checked against allowlist", () => {
+		const result = validateQuery(
+			"SELECT * FROM employees@test.dev2",
+			["EMPLOYEES@TEST.DEV2"],
+			"HR"
+		);
+		expect(result.valid).toBe(true);
+	});
+
+	test("schema-qualified database link references are checked against allowlist", () => {
+		const result = validateQuery(
+			"SELECT * FROM hr.employees@test.dev2",
+			["HR.EMPLOYEES@TEST.DEV2"],
+			"SCOTT"
+		);
+		expect(result.valid).toBe(true);
+	});
+
+	test("database link references do not match local allowlist entries", () => {
+		const result = validateQuery(
+			"SELECT * FROM employees@test.dev2",
+			["EMPLOYEES"],
+			"HR"
+		);
+		expect(result.valid).toBe(false);
+	});
 });

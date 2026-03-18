@@ -2,11 +2,11 @@ import { z } from "zod";
 import { loadConfig, resolveEnvironment } from "../config";
 import { getConnection } from "../connection";
 import oracledb from "oracledb";
-import { isTableAllowed } from "./allowlist";
+import { isTableAllowed, normalizeIdentifier } from "./allowlist";
 
 export const listTablesSchema = {
-	environment: z.string().describe("Named environment from config (e.g. 'dev', 'test', 'prod')"),
-	schema: z.string().optional().describe("Schema/owner name to filter by. Defaults to the connected user's schema."),
+	environment: z.string().trim().min(1).describe("Named environment from config (e.g. 'dev', 'test', 'prod')"),
+	schema: z.string().trim().min(1).optional().describe("Schema/owner name to filter by. Defaults to the connected user's schema."),
 };
 
 export type ListTablesDeps = {
@@ -30,7 +30,21 @@ export async function listTablesHandlerWithDeps(
 	try {
 		const config = deps.loadConfig();
 		const env = deps.resolveEnvironment(config, environment);
-		const schemaFilter = (schema ?? env.username).toUpperCase();
+		const schemaFilter = normalizeIdentifier(schema ?? env.username);
+
+		if (schemaFilter.includes("@")) {
+			return {
+				content: [{
+					type: "text" as const,
+					text: JSON.stringify({
+						error: "INVALID_ARGUMENT",
+						message: "Schema argument must not include a database link. list_tables only supports local schema discovery.",
+						environment,
+					}, null, 2),
+				}],
+			};
+		}
+
 		connection = await deps.getConnection(environment, env);
 
 		const result = await connection.execute<Record<string, unknown>>(

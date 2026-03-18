@@ -277,7 +277,7 @@ const server = new McpServer({
 
 **Behavior:**
 
-Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an allowlist is enabled for the environment, filters results to only show allowlisted tables. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Returns table name, owner, type (TABLE or VIEW), and row count estimate from Oracle statistics.
+Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an allowlist is enabled for the environment, filters results to only show allowlisted tables. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Returns table name, owner, type (TABLE or VIEW), and row count estimate from Oracle statistics. This tool is local-only and does not browse remote catalogs over database links.
 
 **Response shape:**
 
@@ -306,12 +306,12 @@ Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an 
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `environment` | `string` | Yes | Named environment from config |
-| `table` | `string` | Yes | Table or view name |
+| `table` | `string` | Yes | Table or view name. Supports `TABLE`, `SCHEMA.TABLE`, `TABLE@DBLINK`, or `SCHEMA.TABLE@DBLINK` |
 | `schema` | `string` | No | Schema/owner name. Defaults to the connected user's schema |
 
 **Behavior:**
 
-Executes hardcoded internal queries against `ALL_TAB_COLUMNS` and `ALL_COL_COMMENTS`. Returns column metadata in ordinal position order. If an allowlist is enabled for the environment, the requested table must be in the allowlist. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access.
+Executes hardcoded internal queries against `ALL_TAB_COLUMNS` and `ALL_COL_COMMENTS`. Returns column metadata in ordinal position order. If an allowlist is enabled for the environment, the requested table must be in the allowlist. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Remote objects are supported only when explicitly named with `TABLE@DBLINK` or `SCHEMA.TABLE@DBLINK`; the `schema` argument must not include a database link.
 
 **Response shape:**
 
@@ -319,6 +319,7 @@ Executes hardcoded internal queries against `ALL_TAB_COLUMNS` and `ALL_COL_COMME
 {
   "table": "SAMPLE",
   "owner": "USGS",
+  "dblink": null,
   "environment": "dev",
   "columns": [
     {
@@ -347,7 +348,8 @@ If allowlist enforcement blocks access, the response shape is:
   "message": "Table OWNER.TABLE is not in the allowlist for this environment.",
   "environment": "dev",
   "owner": "OWNER",
-  "table": "TABLE"
+  "table": "TABLE",
+  "dblink": null
 }
 ```
 
@@ -380,7 +382,7 @@ Reject any node representing DDL: `CREATE`, `DROP`, `ALTER`, `TRUNCATE`, `RENAME
 Reject any node representing procedural execution: `EXEC`, `EXECUTE`, `CALL`, or `BEGIN...END` blocks. Also reject row-locking `FOR UPDATE` clauses.
 
 **Step 7 - Allowlist check (if enabled for environment)**
-Extract all table references from the parse tree. If any referenced table is not in the environment's `allowed_tables` list, reject with: `"Query references table FORBIDDEN_TABLE which is not in the allowlist for this environment. Allowed tables: SAMPLE, RESULT."` Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access.
+Extract all table references from the parse tree. If any referenced table is not in the environment's `allowed_tables` list, reject with: `"Query references table FORBIDDEN_TABLE which is not in the allowlist for this environment. Allowed tables: SAMPLE, RESULT."` Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Database link references such as `TABLE@DBLINK` and `SCHEMA.TABLE@DBLINK` must match allowlist entries explicitly.
 
 ### Failure Mode
 

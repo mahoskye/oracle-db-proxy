@@ -120,7 +120,7 @@ environments:
 When `allowlist_enabled: true`, only tables listed under `allowed_tables` can be queried via `run_query`.
 `list_tables` is filtered down to allowlisted objects, and `get_table_schema` denies access to non-allowlisted tables.
 The agent receives clear rejection messages with enough detail to correct and retry.
-Use `SCHEMA.TABLE` entries when you need cross-schema access. Unqualified entries apply to the connected user's default schema.
+Use `SCHEMA.TABLE` entries when you need cross-schema access. Unqualified entries apply to the connected user's default schema. Use `TABLE@DBLINK` or `SCHEMA.TABLE@DBLINK` when you need to allow remote objects over Oracle database links.
 
 When `allowlist_enabled: false`, any table accessible to the database user can be queried.
 
@@ -218,12 +218,14 @@ Returns rows as an array of objects. If results are truncated by the row limit, 
 
 ### `list_tables`
 
-Lists all tables and views accessible in the specified environment.
+Lists local tables and views accessible in the specified environment.
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `environment` | string | Yes | Named environment from config |
 | `schema` | string | No | Schema/owner to filter by. Defaults to the connected user's schema |
+
+This tool only lists local objects visible through the current Oracle connection. It does not browse remote catalogs over database links.
 
 ### `get_table_schema`
 
@@ -232,15 +234,20 @@ Returns column definitions for a specific table or view.
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `environment` | string | Yes | Named environment from config |
-| `table` | string | Yes | Table or view name |
+| `table` | string | Yes | Table or view name. Supports `TABLE`, `SCHEMA.TABLE`, `TABLE@DBLINK`, or `SCHEMA.TABLE@DBLINK` |
 | `schema` | string | No | Schema/owner. Defaults to the connected user's schema |
+
+This tool can inspect explicitly named remote objects over Oracle database links when the database link is included in `table`. The `schema` parameter must not include a database link.
 
 If allowlists are enabled and the requested object is not allowlisted, this tool returns:
 
 ```json
 {
   "error": "ACCESS_DENIED",
-  "message": "Table OWNER.TABLE is not in the allowlist for this environment."
+  "message": "Table OWNER.TABLE is not in the allowlist for this environment.",
+  "owner": "OWNER",
+  "table": "TABLE",
+  "dblink": null
 }
 ```
 
@@ -254,7 +261,7 @@ Every query submitted to `run_query` passes through a validation pipeline before
 2. **Single statement**: multiple semicolon-separated statements are rejected.
 3. **SELECT only**: the root statement must be a SELECT.
 4. **Tree walk**: every node in the full parse tree is inspected. Any INSERT, UPDATE, DELETE, MERGE, CREATE, DROP, ALTER, TRUNCATE, EXEC, CALL, or `FOR UPDATE` row-locking clause is rejected, including those hidden inside CTEs.
-5. **Allowlist**: if enabled for the environment, all table references are checked against the allowlist.
+5. **Allowlist**: if enabled for the environment, all table references are checked against the allowlist, including schema-qualified and database-link references such as `SCHEMA.TABLE@DBLINK`.
 
 Rejection messages are returned with specific details so the agent can correct and retry.
 

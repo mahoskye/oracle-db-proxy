@@ -56,6 +56,50 @@ describe("listTablesHandlerWithDeps", () => {
 		expect(close).toHaveBeenCalledTimes(1);
 	});
 
+	test("preserves quoted schema case for Oracle metadata lookup", async () => {
+		const execute = jest.fn(async (_sql: string, binds: unknown) => {
+			expect(binds).toEqual({ schema: "Hr" });
+			return { rows: [] };
+		});
+		const close = jest.fn(async () => {});
+		const deps: ListTablesDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: async () => ({ execute, close } as never),
+		};
+
+		const response = await listTablesHandlerWithDeps(
+			{ environment: "dev", schema: '"Hr"' },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload.schema).toBe("Hr");
+		expect(close).toHaveBeenCalledTimes(1);
+	});
+
+	test("rejects schema arguments that include a database link", async () => {
+		const getConnection = jest.fn(async () => ({}));
+		const deps: ListTablesDeps = {
+			loadConfig: () => ({} as never),
+			resolveEnvironment: () => BASE_ENV,
+			getConnection: getConnection as never,
+		};
+
+		const response = await listTablesHandlerWithDeps(
+			{ environment: "dev", schema: "hr@test.dev2" },
+			deps
+		) as ToolResult;
+		const payload = parseToolText(response);
+
+		expect(payload).toEqual({
+			error: "INVALID_ARGUMENT",
+			message: "Schema argument must not include a database link. list_tables only supports local schema discovery.",
+			environment: "dev",
+		});
+		expect(getConnection).not.toHaveBeenCalled();
+	});
+
 	test("returns execution error payload when query fails", async () => {
 		const execute = jest.fn(async () => {
 			throw new Error("boom");

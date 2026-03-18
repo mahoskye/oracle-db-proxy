@@ -3,8 +3,8 @@ import { loadConfig, resolveEnvironment } from "../config";
 import { executeQuery } from "../executor";
 
 export const runQuerySchema = {
-	environment: z.string().describe("Named environment from config (e.g. 'dev', 'test', 'prod')"),
-	sql: z.string().describe("A SELECT statement to execute. No writes, DDL, procedure execution permitted."),
+	environment: z.string().trim().min(1).describe("Named environment from config (e.g. 'dev', 'test', 'prod')"),
+	sql: z.string().trim().min(1).describe("A SELECT statement to execute. No writes, DDL, procedure execution permitted."),
 };
 
 /** MCP handler for `run_query`. Loads config, resolves the environment, and delegates to `executeQuery`. */

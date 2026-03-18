@@ -1,5 +1,5 @@
 import { getParserFromInput } from "@griffithswaite/ts-plsql-parser";
-import { isTableAllowed, normalizeIdentifier } from "./tools/allowlist";
+import { isTableAllowed, normalizeIdentifier, parseIdentifierTokensReference } from "./tools/allowlist";
 
 type ParseTreeNode = {
 	children?: ParseTreeNode[];
@@ -133,8 +133,8 @@ function classifyRootStatementType(unitStatement: ParseTreeNode): string {
 	return toStatementType(unitChildType);
 }
 
-function extractTableReferences(unitStatement: ParseTreeNode): string[] {
-	const tableNames = new Set<string>();
+function extractTableReferences(unitStatement: ParseTreeNode): Array<{ full: string; owner?: string; table: string; dblink?: string }> {
+	const tableNames = new Map<string, { full: string; owner?: string; table: string; dblink?: string }>();
 	const cteNames = new Set<string>();
 
 	walkTree(unitStatement, "root", (node) => {
@@ -151,13 +151,16 @@ function extractTableReferences(unitStatement: ParseTreeNode): string[] {
 		}
 
 		if (type === "Tableview_nameContext") {
-			tableNames.add(normalized);
+			const parsed = parseIdentifierTokensReference(text);
+			if (parsed) {
+				tableNames.set(normalized, parsed);
+			}
 		}
 
 		return null;
 	});
 
-	return [...tableNames].filter((tableName) => !cteNames.has(tableName));
+	return [...tableNames.values()].filter((tableRef) => !cteNames.has(tableRef.full));
 }
 
 function findForbiddenOperation(unitStatement: ParseTreeNode): string | null {
@@ -261,16 +264,12 @@ export function validateQuery(
 	// Step 7 - Allowlist check if provided
 	if (allowlist) {
 		const tableReferences = extractTableReferences(rootStatement);
-		for (const tableName of tableReferences) {
-			const dot = tableName.lastIndexOf(".");
-			const owner = dot === -1 ? undefined : tableName.slice(0, dot);
-			const table = dot === -1 ? tableName : tableName.slice(dot + 1);
-
-			if (!isTableAllowed(allowlist, table, owner, defaultSchema)) {
+		for (const tableRef of tableReferences) {
+			if (!isTableAllowed(allowlist, tableRef.table, tableRef.owner, defaultSchema, tableRef.dblink)) {
 				const allowedTables = allowlist.length > 0 ? allowlist.join(", ") : "(none)";
 				return {
 					valid: false,
-					reason: `Query references table ${tableName} which is not in the allowlist for this environment. Allowed tables: ${allowedTables}.`
+					reason: `Query references table ${tableRef.full} which is not in the allowlist for this environment. Allowed tables: ${allowedTables}.`
 				};
 			}
 		}
