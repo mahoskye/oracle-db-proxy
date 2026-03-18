@@ -279,6 +279,8 @@ const server = new McpServer({
 
 Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an allowlist is enabled for the environment, filters results to only show allowlisted tables. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Returns table name, owner, type (TABLE or VIEW), and row count estimate from Oracle statistics. This tool is local-only and does not browse remote catalogs over database links.
 
+Use this first when the agent does not yet know the correct local table or view name.
+
 **Response shape:**
 
 ```json
@@ -312,6 +314,8 @@ Executes a hardcoded internal query against `ALL_TABLES` and `ALL_VIEWS`. If an 
 **Behavior:**
 
 Executes hardcoded internal queries against `ALL_TAB_COLUMNS` and `ALL_COL_COMMENTS`. Returns column metadata in ordinal position order. If an allowlist is enabled for the environment, the requested table must be in the allowlist. Unqualified allowlist entries apply to the connected user's default schema; use `SCHEMA.TABLE` entries for cross-schema access. Remote objects are supported only when explicitly named with `TABLE@DBLINK` or `SCHEMA.TABLE@DBLINK`; the `schema` argument must not include a database link.
+
+Use this before querying an unfamiliar table or view. For remote objects, call this directly with an explicit `TABLE@DBLINK` or `SCHEMA.TABLE@DBLINK` reference.
 
 **Response shape:**
 
@@ -352,6 +356,14 @@ If allowlist enforcement blocks access, the response shape is:
   "dblink": null
 }
 ```
+
+**Recommended agent workflow:**
+
+1. Use `list_tables` to discover local object names when needed.
+2. Use `get_table_schema` before querying an unfamiliar object.
+3. Use `run_query` only after the object and columns are known.
+
+For remote objects over Oracle database links, skip `list_tables` and call `get_table_schema` directly with an explicit remote reference.
 
 ---
 

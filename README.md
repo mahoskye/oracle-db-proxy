@@ -216,6 +216,8 @@ Executes a read-only SELECT query against the specified environment.
 
 Returns rows as an array of objects. If results are truncated by the row limit, a warning is included with the total row count so the agent can refine its query.
 
+Use this after you know the object names you need. If the table is unfamiliar, call `get_table_schema` first.
+
 ### `list_tables`
 
 Lists local tables and views accessible in the specified environment.
@@ -226,6 +228,8 @@ Lists local tables and views accessible in the specified environment.
 | `schema` | string | No | Schema/owner to filter by. Defaults to the connected user's schema |
 
 This tool only lists local objects visible through the current Oracle connection. It does not browse remote catalogs over database links.
+
+Use this first when exploring a local environment and you do not yet know the correct table or view name.
 
 ### `get_table_schema`
 
@@ -239,6 +243,13 @@ Returns column definitions for a specific table or view.
 
 This tool can inspect explicitly named remote objects over Oracle database links when the database link is included in `table`. The `schema` parameter must not include a database link.
 
+Examples:
+
+- Local default schema: `table: "EMPLOYEES"`
+- Local explicit schema: `table: "EMPLOYEES", schema: "HR"` or `table: "HR.EMPLOYEES"`
+- Remote default schema: `table: "EMPLOYEES@TEST.DEV2"`
+- Remote explicit schema: `table: "HR.EMPLOYEES@TEST.DEV2"`
+
 If allowlists are enabled and the requested object is not allowlisted, this tool returns:
 
 ```json
@@ -250,6 +261,16 @@ If allowlists are enabled and the requested object is not allowlisted, this tool
   "dblink": null
 }
 ```
+
+## Recommended Workflow
+
+For best results, agents should usually follow this sequence:
+
+1. Use `list_tables` to discover local object names when the schema is not known.
+2. Use `get_table_schema` before querying an unfamiliar table or view.
+3. Use `run_query` only after the object name and columns are known.
+
+For remote objects over Oracle database links, skip `list_tables` and call `get_table_schema` directly with an explicit `TABLE@DBLINK` or `SCHEMA.TABLE@DBLINK` reference.
 
 ## Security Model
 
