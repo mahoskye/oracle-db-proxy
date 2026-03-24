@@ -120,17 +120,17 @@ export async function getTableSchemaHandlerWithDeps(
 					   c.column_id AS position,
 					   c.data_type,
 					   CASE WHEN c.nullable = 'Y' THEN 1 ELSE 0 END AS nullable,
-					   cc.comments AS comment
+					   cc.comments AS "comment"
 				FROM all_tab_columns${dbLinkSuffix} c
 				LEFT JOIN all_col_comments${dbLinkSuffix} cc
 					ON cc.owner = c.owner
 					AND cc.table_name = c.table_name
 					AND cc.column_name = c.column_name
-				WHERE c.owner = :schema
-					AND c.table_name = :table
+				WHERE c.owner = :owner
+					AND c.table_name = :table_name
 				ORDER BY c.column_id
 			`,
-			{ schema: schemaFilter, table: tableFilter },
+			{ owner: schemaFilter, table_name: tableFilter },
 			{ outFormat: oracledb.OUT_FORMAT_OBJECT }
 		);
 
