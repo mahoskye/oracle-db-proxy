@@ -76,7 +76,7 @@ export async function getTableSchemaHandlerWithDeps(
 	try {
 		const config = deps.loadConfig();
 		const env = deps.resolveEnvironment(config, environment);
-		const { schemaFilter, tableFilter, dblinkFilter, inputError } = parseTableReference(schema, table, env.username);
+		const { schemaFilter, tableFilter, dblinkFilter, inputError } = parseTableReference(schema, table, env.default_schema ?? env.username);
 
 		if (inputError) {
 			return {

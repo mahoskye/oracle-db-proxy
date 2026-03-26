@@ -41,6 +41,7 @@ environments:
     service: CHANGE_ME
     allowlist_enabled: true
     allowed_tables: []
+    # default_schema: OTHER_SCHEMA  # optional: switches CURRENT_SCHEMA on connect
 `;
 
 // Establish the audit.db schema

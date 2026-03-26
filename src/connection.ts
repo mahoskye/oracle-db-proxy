@@ -55,7 +55,8 @@ async function getPool(name: string, env: ResolvedEnvironment): Promise<oracledb
 
 /**
  * Returns an Oracle connection from the pool for the given environment,
- * creating the pool lazily on first use. Sets `callTimeout` from config.
+ * creating the pool lazily on first use. Sets `callTimeout` from config
+ * and switches `CURRENT_SCHEMA` when `default_schema` is configured.
  */
 export async function getConnection(
 	name: string,
@@ -64,6 +65,11 @@ export async function getConnection(
 	const pool = await getPool(name, env);
 	const connection = await pool.getConnection();
 	connection.callTimeout = env.timeout_seconds * 1000;
+	if (env.default_schema) {
+		await connection.execute(
+			`ALTER SESSION SET CURRENT_SCHEMA = "${env.default_schema.toUpperCase()}"`
+		);
+	}
 	return connection;
 }
 

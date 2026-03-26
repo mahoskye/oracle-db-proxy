@@ -17,6 +17,7 @@ const EnvironmentSchema = z.object({
 	allowed_tables: z.array(z.string().min(1)).optional(),
 	timeout_seconds: z.number().int().positive().optional(),
 	max_rows: z.number().int().positive().optional(),
+	default_schema: z.string().min(1).optional(),
 	credentials: CredentialSchema.optional(), // overrides top-level credentials
 }).strict();
 
@@ -45,6 +46,7 @@ export type ResolvedEnvironment = {
   allowed_tables: string[];
   timeout_seconds: number;
   max_rows: number;
+  default_schema?: string;
   username: string;
   password: string; // resolved form env var, not the var name
 };
@@ -101,6 +103,7 @@ export function resolveEnvironment(config: Config, name: string): ResolvedEnviro
 		allowed_tables: env.allowed_tables ?? [],
 		timeout_seconds: env.timeout_seconds ?? config.defaults.timeout_seconds,
 		max_rows: env.max_rows ?? config.defaults.max_rows,
+		default_schema: env.default_schema,
 		username: creds.username,
 		password,
 	};

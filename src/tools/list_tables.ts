@@ -30,7 +30,7 @@ export async function listTablesHandlerWithDeps(
 	try {
 		const config = deps.loadConfig();
 		const env = deps.resolveEnvironment(config, environment);
-		const schemaFilter = normalizeIdentifier(schema ?? env.username);
+		const schemaFilter = normalizeIdentifier(schema ?? env.default_schema ?? env.username);
 
 		if (schemaFilter.includes("@")) {
 			return {

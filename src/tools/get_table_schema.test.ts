@@ -57,7 +57,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 
 	test("returns column metadata and closes connection on success", async () => {
 		const execute = jest.fn(async (_sql: string, binds: unknown) => {
-			expect(binds).toEqual({ schema: "HR", table: "EMPLOYEES" });
+			expect(binds).toEqual({ owner: "HR", table_name: "EMPLOYEES" });
 			return {
 				rows: [
 					{
@@ -115,7 +115,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 
 	test("accepts schema-qualified table names in the table argument", async () => {
 		const execute = jest.fn(async (_sql: string, binds: unknown) => {
-			expect(binds).toEqual({ schema: "HR", table: "EMPLOYEES" });
+			expect(binds).toEqual({ owner: "HR", table_name: "EMPLOYEES" });
 			return {
 				rows: [
 					{
@@ -149,7 +149,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 
 	test("preserves quoted identifier case for Oracle lookups", async () => {
 		const execute = jest.fn(async (_sql: string, binds: unknown) => {
-			expect(binds).toEqual({ schema: "Hr", table: "Employees" });
+			expect(binds).toEqual({ owner: "Hr", table_name: "Employees" });
 			return {
 				rows: [
 					{
@@ -185,7 +185,7 @@ describe("getTableSchemaHandlerWithDeps", () => {
 		const execute = jest.fn(async (sql: string, binds: unknown) => {
 			expect(sql).toContain("FROM all_tab_columns@TEST.DEV2 c");
 			expect(sql).toContain("LEFT JOIN all_col_comments@TEST.DEV2 cc");
-			expect(binds).toEqual({ schema: "HR", table: "EMPLOYEES" });
+			expect(binds).toEqual({ owner: "HR", table_name: "EMPLOYEES" });
 			return {
 				rows: [
 					{

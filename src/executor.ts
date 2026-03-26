@@ -49,6 +49,31 @@ export function normalizeSqlInput(sql: string): string {
 }
 
 /**
+ * Converts Oracle-specific column values (LOBs, Dates, Buffers) into
+ * JSON-safe primitives so that `JSON.stringify` never hits cyclic references.
+ */
+function sanitizeRow(row: Record<string, unknown>): Record<string, unknown> {
+	const clean: Record<string, unknown> = {};
+	for (const [key, value] of Object.entries(row)) {
+		if (value === null || value === undefined) {
+			clean[key] = value;
+		} else if (value instanceof Date) {
+			clean[key] = value.toISOString();
+		} else if (Buffer.isBuffer(value)) {
+			clean[key] = value.toString("base64");
+		} else if (typeof value === "object" && value !== null && typeof (value as any).getData === "function") {
+			// Oracle LOB objects — skip (too large / cyclic); surface placeholder
+			clean[key] = "[LOB]";
+		} else if (typeof value === "bigint") {
+			clean[key] = value.toString();
+		} else {
+			clean[key] = value;
+		}
+	}
+	return clean;
+}
+
+/**
  * Validates and executes a SELECT query against the named environment.
  * Wraps the query with a ROWNUM limit and runs a COUNT(*) when the row limit is reached.
  * All outcomes (success, rejection, error) are audit-logged.
@@ -91,7 +116,7 @@ export async function executeQuery(
 			{outFormat: oracledb.OUT_FORMAT_OBJECT}
 		);
 
-		const rows = dataResult.rows ?? [];
+		const rows = (dataResult.rows ?? []).map(sanitizeRow);
 		const hitLimit = rows.length === env.max_rows;
 
 		// Only run count query if we hit the limit - otherwise we already have everything
